@@ -7,9 +7,19 @@
     const socket = io();
     socket.on('chat', msg => {
       const div = document.createElement('div');
-      div.textContent = msg;
+      div.textContent = msg.user + ': ' + msg.msg;
       document.getElementById('chat').appendChild(div);
     });
+    socket.on('connect', () => {
+      document.getElementById('status').textContent = '在线';
+    });
+    socket.on('disconnect', () => {
+      document.getElementById('status').textContent = '离线';
+    });
+    const pingInterval = {{ ping_interval|default(1000) }};
+    setInterval(() => {
+      socket.emit('ping');
+    }, pingInterval);
     function send(){
       const val = document.getElementById('msg').value;
       socket.emit('chat', val);
@@ -18,12 +28,26 @@
   </script>
 </head>
 <body>
+<p id="status"></p>
+<p>剩余机器: {{ remaining }}</p>
 <div id="chat"></div>
 <input id="msg"><button onclick="send()">Send</button>
 <hr>
 <div style="display:flex; flex-wrap:wrap;">
-{% for s in sessions %}
-  <iframe src="http://localhost:{{s.port}}/vnc.html?view_only={{ 'true' if s.user_id != self_id else 'false' }}" width="320" height="240"></iframe>
+{% for item in sessions %}
+  {% set s = item.session %}
+  <div style="margin:5px;">
+    <p>{{ item.username }} - {{ '在线' if item.online else '离线' }}</p>
+    <iframe src="http://localhost:{{s.port}}/vnc.html?view_only={{ 'true' if item.view_only else 'false' }}" width="320" height="240"></iframe>
+    <p>剩余 {{ item.remaining }} 秒</p>
+    <a href="{{ url_for('full_view', sid=s.id) }}">放大</a>
+    {% if not item.view_only %}
+      <div>
+        <a href="{{ url_for('extend') }}">续时间</a>
+        <a href="{{ url_for('delete') }}">删除</a>
+      </div>
+    {% endif %}
+  </div>
 {% endfor %}
 </div>
 <a href="{{ url_for('logout') }}">Logout</a>

@@ -1,14 +1,16 @@
 import os
 import socket
+import threading
 from datetime import datetime, timedelta
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, session as flask_session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
+from werkzeug.security import generate_password_hash, check_password_hash
 import docker
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'secret')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -16,9 +18,13 @@ socketio = SocketIO(app)
 db = SQLAlchemy(app)
 client = docker.from_env()
 
-MAX_USERS = 50
-IMAGE = "dorowu/ubuntu-desktop-lxde-vnc:latest"
-INACTIVE_TIMEOUT = 600  # seconds
+MAX_USERS = int(os.environ.get('MAX_USERS', '50'))
+IMAGE = os.environ.get("DESKTOP_IMAGE", "dorowu/ubuntu-desktop-lxde-vnc:latest")
+MEM_LIMIT = os.environ.get("DESKTOP_MEM", "512m")
+CPU_LIMIT = float(os.environ.get("DESKTOP_CPUS", "0.5"))
+INACTIVE_TIMEOUT = int(os.environ.get('INACTIVE_TIMEOUT', '600'))  # seconds
+ONLINE_THRESHOLD = int(os.environ.get('ONLINE_THRESHOLD', '5'))  # seconds
+PING_INTERVAL = int(os.environ.get('PING_INTERVAL', '1'))  # seconds
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -30,6 +36,7 @@ class Session(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     container_id = db.Column(db.String(64))
     port = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_active = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -46,7 +53,9 @@ def start_container(user):
     container = client.containers.run(
         IMAGE,
         detach=True,
-        ports={'6080/tcp': port}
+        ports={'6080/tcp': port},
+        mem_limit=MEM_LIMIT,
+        nano_cpus=int(CPU_LIMIT * 1e9)
     )
     sess = Session(user_id=user.id, container_id=container.id, port=port)
     db.session.add(sess)
@@ -67,17 +76,81 @@ def cleanup_inactive():
     db.session.commit()
 
 
+def cleanup_loop():
+    while True:
+        socketio.sleep(60)
+        with app.app_context():
+            cleanup_inactive()
+
+
+@app.route('/extend')
+def extend():
+    if 'user_id' not in flask_session:
+        return redirect(url_for('login'))
+    sess = Session.query.filter_by(user_id=flask_session['user_id']).first()
+    if sess:
+        sess.last_active = datetime.utcnow()
+        db.session.commit()
+    return redirect(url_for('index'))
+
+
+@app.route('/delete')
+def delete():
+    if 'user_id' not in flask_session:
+        return redirect(url_for('login'))
+    sess = Session.query.filter_by(user_id=flask_session['user_id']).first()
+    if sess:
+        try:
+            container = client.containers.get(sess.container_id)
+            container.remove(force=True)
+        except docker.errors.NotFound:
+            pass
+        db.session.delete(sess)
+        db.session.commit()
+    return redirect(url_for('index'))
+
+
 @app.route('/', methods=['GET'])
 def index():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('login'))
     cleanup_inactive()
-    user = User.query.get(session['user_id'])
+    user = User.query.get(flask_session['user_id'])
     sess = Session.query.filter_by(user_id=user.id).first()
     if not sess and Session.query.count() < MAX_USERS:
         sess = start_container(user)
-    sessions = Session.query.all()[:6]
-    return render_template('index.html', sessions=sessions, self_id=user.id)
+    remaining = MAX_USERS - Session.query.count()
+    sessions = Session.query.all()
+    sessions.sort(key=lambda s: 0 if s.user_id == user.id else 1)
+    session_info = []
+    now = datetime.utcnow()
+    for s in sessions:
+        remain = INACTIVE_TIMEOUT - int((now - s.last_active).total_seconds())
+        view_only = s.user_id != user.id
+        online = now - s.last_active < timedelta(seconds=ONLINE_THRESHOLD)
+        session_info.append({
+            'session': s,
+            'remaining': max(0, remain),
+            'view_only': view_only,
+            'online': online,
+            'username': User.query.get(s.user_id).username
+        })
+    return render_template(
+        'index.html',
+        sessions=session_info,
+        self_id=user.id,
+        remaining=remaining,
+        ping_interval=PING_INTERVAL * 1000
+    )
+
+
+@app.route('/full/<int:sid>')
+def full_view(sid):
+    if 'user_id' not in flask_session:
+        return redirect(url_for('login'))
+    s = Session.query.get_or_404(sid)
+    view_only = 'true' if s.user_id != flask_session['user_id'] else 'false'
+    return render_template('full.html', session=s, view_only=view_only)
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -87,10 +160,10 @@ def register():
         password = request.form['password']
         if User.query.filter_by(username=username).first():
             return 'User exists', 400
-        user = User(username=username, password=password)
+        user = User(username=username, password=generate_password_hash(password))
         db.session.add(user)
         db.session.commit()
-        session['user_id'] = user.id
+        flask_session['user_id'] = user.id
         return redirect(url_for('index'))
     return render_template('register.html')
 
@@ -100,23 +173,47 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        user = User.query.filter_by(username=username, password=password).first()
+        user = User.query.filter_by(username=username).first()
+        if user and not check_password_hash(user.password, password):
+            user = None
         if not user:
             return 'Invalid credentials', 400
-        session['user_id'] = user.id
+        flask_session['user_id'] = user.id
         return redirect(url_for('index'))
     return render_template('login.html')
 
 
 @app.route('/logout')
 def logout():
-    session.clear()
+    flask_session.clear()
     return redirect(url_for('login'))
 
 
 @socketio.on('chat')
 def handle_chat(msg):
-    emit('chat', msg, broadcast=True)
+    user = None
+    if 'user_id' in flask_session:
+        user = User.query.get(flask_session['user_id'])
+    emit('chat', {'user': user.username if user else 'anon', 'msg': msg}, broadcast=True)
+
+
+@socketio.on('ping')
+def handle_ping():
+    if 'user_id' in flask_session:
+        sess = Session.query.filter_by(user_id=flask_session['user_id']).first()
+        if sess:
+            sess.last_active = datetime.utcnow()
+            db.session.commit()
+
+
+@socketio.on('connect')
+def handle_connect():
+    pass
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    pass
 
 
 def init_db():
@@ -125,4 +222,5 @@ def init_db():
 
 if __name__ == '__main__':
     init_db()
+    socketio.start_background_task(cleanup_loop)
     socketio.run(app, host='0.0.0.0', port=5000)
