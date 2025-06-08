@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import docker
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'secret')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -18,11 +18,11 @@ socketio = SocketIO(app)
 db = SQLAlchemy(app)
 client = docker.from_env()
 
-MAX_USERS = 50
+MAX_USERS = int(os.environ.get('MAX_USERS', '50'))
 IMAGE = os.environ.get("DESKTOP_IMAGE", "dorowu/ubuntu-desktop-lxde-vnc:latest")
 MEM_LIMIT = os.environ.get("DESKTOP_MEM", "512m")
 CPU_LIMIT = float(os.environ.get("DESKTOP_CPUS", "0.5"))
-INACTIVE_TIMEOUT = 600  # seconds
+INACTIVE_TIMEOUT = int(os.environ.get('INACTIVE_TIMEOUT', '600'))  # seconds
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -125,7 +125,13 @@ def index():
     for s in sessions:
         remain = INACTIVE_TIMEOUT - int((now - s.last_active).total_seconds())
         view_only = s.user_id != user.id
-        session_info.append({'session': s, 'remaining': max(0, remain), 'view_only': view_only})
+        online = now - s.last_active < timedelta(seconds=5)
+        session_info.append({
+            'session': s,
+            'remaining': max(0, remain),
+            'view_only': view_only,
+            'online': online
+        })
     return render_template('index.html', sessions=session_info, self_id=user.id, remaining=remaining)
 
 
@@ -176,7 +182,10 @@ def logout():
 
 @socketio.on('chat')
 def handle_chat(msg):
-    emit('chat', msg, broadcast=True)
+    user = None
+    if 'user_id' in flask_session:
+        user = User.query.get(flask_session['user_id'])
+    emit('chat', {'user': user.username if user else 'anon', 'msg': msg}, broadcast=True)
 
 
 @socketio.on('ping')
