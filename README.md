@@ -12,13 +12,14 @@ A simple chat is available on the home page.
   `dorowu/ubuntu-desktop-lxde-vnc:latest` exposing a noVNC interface.
 - Up to 50 active containers are allowed. Inactive containers are removed
   after 10 minutes.
-- Home page displays up to six desktops simultaneously (the current user and
-  others in view-only mode).
+- Home page lists all active desktops in a scrollable grid. Your own desktop is
+  interactive while others are view-only.
 - Chat implemented with Socket.IO.
 - Remaining capacity and connection status displayed.
 - Buttons to extend time or delete your container.
 - Background task cleans up inactive containers every minute.
 - Passwords stored using Werkzeug hashing.
+- Containers run with configurable memory and CPU limits.
 - Remaining time and a fullscreen link shown for each desktop.
 
 ## Running
@@ -26,6 +27,13 @@ A simple chat is available on the home page.
 ```bash
 pip install -r requirements.txt
 python app/server.py
+```
+
+Environment variables can be used to configure the Docker image and resource
+limits:
+
+```
+DESKTOP_IMAGE=your/image:tag DESKTOP_MEM=512m DESKTOP_CPUS=0.5 python app/server.py
 ```
 
 Open `http://localhost:5000` in your browser.
