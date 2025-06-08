@@ -15,12 +15,13 @@ A simple chat is available on the home page.
 - Home page lists all active desktops in a scrollable grid. Your own desktop is
   interactive while others are view-only.
 - Chat implemented with Socket.IO.
+- Messages in chat display the sender's username.
 - Remaining capacity and connection status displayed.
 - Buttons to extend time or delete your container.
 - Background task cleans up inactive containers every minute.
 - Passwords stored using Werkzeug hashing.
 - Containers run with configurable memory and CPU limits.
-- Remaining time and a fullscreen link shown for each desktop.
+- Remaining time, online status and a fullscreen link shown for each desktop.
 
 ## Running
 
@@ -29,11 +30,17 @@ pip install -r requirements.txt
 python app/server.py
 ```
 
-Environment variables can be used to configure the Docker image and resource
-limits:
+Environment variables can be used to configure the Docker image, resource limits
+and other options:
 
 ```
-DESKTOP_IMAGE=your/image:tag DESKTOP_MEM=512m DESKTOP_CPUS=0.5 python app/server.py
+DESKTOP_IMAGE=your/image:tag \
+DESKTOP_MEM=512m \
+DESKTOP_CPUS=0.5 \
+MAX_USERS=20 \
+INACTIVE_TIMEOUT=300 \
+SECRET_KEY=mysecret \
+python app/server.py
 ```
 
 Open `http://localhost:5000` in your browser.
