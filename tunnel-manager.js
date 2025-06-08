@@ -34,7 +34,7 @@ class TunnelManager {
             
             this.tunnels.set(tunnelName, tunnelInfo);
             
-            console.log(`隧道 ${tunnelName} 创建成功: ${tunnelUrl}`);
+            // 隧道创建成功的日志已在上面输出
             
             return {
                 id: tunnelName,
@@ -76,8 +76,6 @@ class TunnelManager {
                 '--logfile', '/dev/null'  // 减少日志输出
             ];
 
-            console.log(`执行命令: ${this.cloudflaredPath} ${args.join(' ')}`);
-
             const tunnelProcess = spawn(this.cloudflaredPath, args, {
                 stdio: ['ignore', 'pipe', 'pipe']
             });
@@ -86,44 +84,51 @@ class TunnelManager {
             let errorOutput = '';
             let stdOutput = '';
 
-            // 监听标准输出
+            // 监听标准输出（静默模式，只查找URL）
             tunnelProcess.stdout.on('data', (data) => {
                 const output = data.toString();
                 stdOutput += output;
-                console.log(`隧道标准输出: ${output.trim()}`);
 
                 // 在标准输出中也检查URL
                 const urlMatch = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
                 if (urlMatch && !urlFound) {
                     urlFound = true;
                     tunnelProcess.tunnelUrl = urlMatch[0];
-                    console.log(`找到隧道URL: ${urlMatch[0]}`);
+                    console.log(`✅ 隧道创建成功: ${urlMatch[0]}`);
                     resolve(tunnelProcess);
                 }
             });
 
-            // 监听错误输出
+            // 监听错误输出（静默模式，只查找URL和关键错误）
             tunnelProcess.stderr.on('data', (data) => {
                 const output = data.toString();
                 errorOutput += output;
-                console.log(`隧道错误输出: ${output.trim()}`);
 
                 // 检查是否有隧道URL（cloudflared通常在stderr输出URL）
                 const urlMatch = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
                 if (urlMatch && !urlFound) {
                     urlFound = true;
                     tunnelProcess.tunnelUrl = urlMatch[0];
-                    console.log(`找到隧道URL: ${urlMatch[0]}`);
+                    console.log(`✅ 隧道创建成功: ${urlMatch[0]}`);
                     resolve(tunnelProcess);
                 }
 
-                // 检查是否有错误信息
+                // 只输出关键错误信息
                 if (output.includes('failed to connect to the edge') ||
                     output.includes('authentication required') ||
-                    output.includes('login required')) {
-                    if (!urlFound) {
-                        tunnelProcess.kill();
-                        reject(new Error(`Cloudflare隧道认证失败: ${output.trim()}`));
+                    output.includes('login required') ||
+                    output.includes('error=') ||
+                    output.includes('ERR ')) {
+
+                    // 只在真正的错误时输出日志
+                    if (output.includes('failed to connect to the edge') ||
+                        output.includes('authentication required') ||
+                        output.includes('login required')) {
+                        console.log(`❌ 隧道错误: ${output.trim()}`);
+                        if (!urlFound) {
+                            tunnelProcess.kill();
+                            reject(new Error(`Cloudflare隧道认证失败: ${output.trim()}`));
+                        }
                     }
                 }
             });

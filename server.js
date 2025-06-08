@@ -337,6 +337,26 @@ async function initializeSystem() {
     console.log('系统初始化完成');
 }
 
+// 每分钟检查容器活动状态
+function startActivityMonitor() {
+    setInterval(async () => {
+        for (const [userId, instance] of userInstances) {
+            if (instance.containerId) {
+                try {
+                    // 检查容器是否还在运行
+                    const isRunning = await dockerManager.isContainerRunning(instance.containerId);
+                    if (!isRunning) {
+                        console.log(`检测到容器 ${instance.containerId} 已停止，清理实例 ${instance.instanceId}`);
+                        await cleanupInstance(userId);
+                    }
+                } catch (error) {
+                    console.error(`检查实例 ${instance.instanceId} 状态时出错:`, error);
+                }
+            }
+        }
+    }, 60 * 1000); // 每分钟检查一次
+}
+
 // 启动服务器
 app.listen(PORT, async () => {
     console.log(`VNC实例申请系统运行在端口 ${PORT}`);
@@ -344,6 +364,10 @@ app.listen(PORT, async () => {
 
     // 初始化系统
     await initializeSystem();
+
+    // 启动活动监控
+    startActivityMonitor();
+    console.log('容器活动监控已启动');
 });
 
 // 优雅关闭
