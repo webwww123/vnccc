@@ -101,7 +101,7 @@ exec unshare -Urmpf bash -c '
     echo "CPU型号: $(grep "^model name" /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)"
     echo "内存大小: $(grep "^MemTotal:" /proc/meminfo | awk "{print \$2/1024/1024 \"GB\"}")"
     
-    # 启动原始VNC服务 (让tini/supervisord接管)
-    echo "🚀 启动VNC服务..."
-    exec /startup.sh
+    # 🔒 收回CAP_SYS_ADMIN权限后启动VNC服务
+    echo "🔒 收回危险权限并启动VNC服务..."
+    exec capsh --drop=cap_sys_admin -- -c "exec /startup.sh"
 '
