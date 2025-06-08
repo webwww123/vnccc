@@ -8,6 +8,9 @@ var systemStatusInterval = null;
 function applyInstance(instanceType) {
     var statusDiv = document.getElementById('status-message');
 
+    // 获取选择的界面类型
+    var interfaceType = document.querySelector('input[name="interfaceType"]:checked').value;
+
     // 禁用所有申请按钮
     disableAllApplyButtons();
 
@@ -21,7 +24,8 @@ function applyInstance(instanceType) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            instanceType: instanceType
+            instanceType: instanceType,
+            interfaceType: interfaceType
         })
     })
     .then(function(response) {
@@ -179,13 +183,24 @@ function updateStatusDisplay(instance) {
             // 开始心跳
             startHeartbeat();
 
+            // 根据界面类型显示不同信息
+            var interfaceInfo = '';
+            var accessInfo = '';
+            if (instance.interfaceType === 'terminal') {
+                interfaceInfo = '<font size="2">配置: Ubuntu Web终端</font><br>';
+                accessInfo = '<font size="1" color="#666666">点击链接访问您的Web终端</font><br>';
+            } else {
+                interfaceInfo = '<font size="2">配置: Ubuntu桌面环境</font><br>';
+                accessInfo = '<font size="1" color="#666666">点击链接访问您的虚拟桌面</font><br>';
+            }
+
             statusDiv.innerHTML =
                 '<div class="success-message">' +
                 '<font size="2">✓ 实例创建成功！</font><br>' +
                 '<font size="2">实例ID: ' + instance.instanceId + '</font><br>' +
-                '<font size="2">VNC访问地址: <a href="' + instance.vncUrl + '" target="_blank">' + instance.vncUrl + '</a></font><br>' +
-                '<font size="2">配置: Ubuntu桌面环境</font><br>' +
-                '<font size="1" color="#666666">点击链接访问您的虚拟桌面</font><br>' +
+                '<font size="2">访问地址: <a href="' + instance.vncUrl + '" target="_blank">' + instance.vncUrl + '</a></font><br>' +
+                interfaceInfo +
+                accessInfo +
                 '<font size="1" color="#cc6600">注意: 闲置10分钟后将自动回收</font><br>' +
                 '<input type="button" value="删除实例" class="btn-enabled" onclick="deleteInstance()" style="margin-top: 10px;">' +
                 '</div>';
@@ -357,11 +372,20 @@ function checkUserStatus() {
             disableAllApplyButtons();
 
             if (data.instance.status === 'ready') {
+                // 根据界面类型显示不同信息
+                var interfaceInfo = '';
+                if (data.instance.interfaceType === 'terminal') {
+                    interfaceInfo = '<font size="2">类型: Web终端</font><br>';
+                } else {
+                    interfaceInfo = '<font size="2">类型: VNC桌面</font><br>';
+                }
+
                 // 实例就绪，显示访问链接
                 statusDiv.innerHTML =
                     '<div class="success-message">' +
                     '<font size="2">✓ 您的实例正在运行</font><br>' +
                     '<font size="2">实例ID: ' + data.instance.instanceId + '</font><br>' +
+                    interfaceInfo +
                     '<font size="2">访问地址: <a href="' + data.instance.vncUrl + '" target="_blank">' + data.instance.vncUrl + '</a></font><br>' +
                     '<font size="1" color="#cc6600">注意: 闲置10分钟后将自动回收</font><br>' +
                     '<input type="button" value="删除实例" class="btn-enabled" onclick="deleteInstance()" style="margin-top: 10px;">' +

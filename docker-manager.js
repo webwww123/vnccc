@@ -72,6 +72,17 @@ class DockerManager {
         this.usedPorts.delete(port);
     }
 
+    // 创建容器（支持不同界面类型）
+    async createContainer(instanceId, instanceType = '24v64g', interfaceType = 'vnc') {
+        if (interfaceType === 'vnc') {
+            return this.createVNCContainer(instanceId, instanceType);
+        } else if (interfaceType === 'terminal') {
+            return this.createTerminalContainer(instanceId, instanceType);
+        } else {
+            throw new Error(`不支持的界面类型: ${interfaceType}`);
+        }
+    }
+
     // 创建VNC容器
     async createVNCContainer(instanceId, instanceType = '24v64g') {
         const port = this.getAvailablePort();
@@ -167,6 +178,88 @@ class DockerManager {
             // 如果创建失败，释放端口
             this.releasePort(port);
             throw new Error(`创建容器失败: ${error.message}`);
+        }
+    }
+
+    // 创建Terminal容器（基于ttyd的Web终端）
+    async createTerminalContainer(instanceId, instanceType = '24v64g') {
+        const port = this.getAvailablePort();
+
+        // 根据实例类型设置资源限制
+        const resourceConfig = this.getResourceConfig(instanceType);
+
+        try {
+            // 使用Ubuntu镜像（包含Python3）
+            await this.pullImage('ubuntu:20.04');
+
+            // 创建容器
+            const container = await this.docker.createContainer({
+                Image: 'ubuntu:20.04',
+                name: `terminal-instance-${instanceId}`,
+                Entrypoint: ['/fakeproc-entrypoint.sh'],
+                Cmd: [],
+                Env: [
+                    `INSTANCE_TYPE=${instanceType}`,
+                    'TERM=xterm-256color'
+                ],
+                ExposedPorts: {
+                    '7681/tcp': {}
+                },
+                HostConfig: {
+                    PortBindings: {
+                        '7681/tcp': [{ HostPort: port.toString() }]
+                    },
+                    Memory: resourceConfig.memory,
+                    CpuShares: resourceConfig.cpuShares,
+                    RestartPolicy: {
+                        Name: 'unless-stopped'
+                    },
+                    // 使用最小特权方案实现硬件伪造
+                    CapAdd: ['SYS_ADMIN'],
+                    Privileged: false,  // 保持非特权
+                    Devices: [
+                        {
+                            PathOnHost: '/dev/fuse',
+                            PathInContainer: '/dev/fuse',
+                            CgroupPermissions: 'rwm'
+                        }
+                    ],
+                    SecurityOpt: [
+                        'seccomp=unconfined',
+                        'no-new-privileges'
+                    ],
+                    Binds: [
+                        `${path.resolve(__dirname, 'fakeproc-entrypoint.sh')}:/fakeproc-entrypoint.sh:ro`,
+                        `${path.resolve(__dirname, 'fakeprocfs.py')}:/fakeprocfs.py:ro`,
+                        `${path.resolve(__dirname, 'create-fake-proc.py')}:/create-fake-proc.py:ro`,
+                        `${path.resolve(__dirname, 'specgen.sh')}:/specgen:ro`,
+                        `${path.resolve(__dirname, 'terminal-startup.sh')}:/startup.sh:ro`
+                    ]
+                },
+                Labels: {
+                    'terminal-instance': 'true',
+                    'instance-id': instanceId,
+                    'instance-type': instanceType,
+                    'created-at': new Date().toISOString()
+                }
+            });
+
+            // 启动容器
+            await container.start();
+
+            console.log(`Terminal容器 ${instanceId} (${instanceType}) 创建并启动成功`);
+
+            return {
+                id: container.id,
+                port: port,
+                name: `terminal-instance-${instanceId}`,
+                instanceType: instanceType
+            };
+
+        } catch (error) {
+            // 如果创建失败，释放端口
+            this.releasePort(port);
+            throw new Error(`创建Terminal容器失败: ${error.message}`);
         }
     }
 

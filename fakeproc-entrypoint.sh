@@ -13,12 +13,15 @@ echo "📋 实例类型: $INSTANCE_TYPE"
 
 # 检查Python环境
 echo "📦 检查Python环境..."
-# 跳过apt更新，使用镜像已有的python3
 if ! command -v python3 >/dev/null 2>&1; then
-    echo "❌ Python3未找到"
-    exit 1
+    echo "⚠️ Python3未找到，正在安装..."
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y python3 >/dev/null 2>&1
+    echo "✅ Python3安装完成"
+else
+    echo "✅ Python3可用"
 fi
-echo "✅ Python3可用"
 
 # 生成配置文件
 echo "⚙️ 生成硬件配置..."
@@ -101,7 +104,44 @@ exec unshare -Urmpf bash -c '
     echo "CPU型号: $(grep "^model name" /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)"
     echo "内存大小: $(grep "^MemTotal:" /proc/meminfo | awk "{print \$2/1024/1024 \"GB\"}")"
     
-    # 🔒 收回CAP_SYS_ADMIN权限后启动VNC服务
-    echo "🔒 收回危险权限并启动VNC服务..."
-    exec capsh --drop=cap_sys_admin -- -c "exec /startup.sh"
+    # 🔒 收回危险权限并启动服务
+    echo "🔒 收回危险权限并启动服务..."
+
+    # 确保PATH包含/usr/sbin
+    export PATH="/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
+    # 确保capsh可用
+    if ! command -v capsh >/dev/null 2>&1; then
+        echo "⚠️ capsh未找到，正在安装libcap2-bin..."
+        export DEBIAN_FRONTEND=noninteractive
+        export TZ=Etc/UTC
+
+        # 修复用户命名空间中的apt权限问题
+        echo "🔧 修复用户命名空间中的apt权限..."
+        echo "APT::Sandbox::User \"root\";" > /etc/apt/apt.conf.d/99sandbox
+
+        # 挂载tmpfs到apt缓存目录解决权限问题
+        mount -t tmpfs tmpfs /var/cache/apt/archives 2>/dev/null || true
+        mount -t tmpfs tmpfs /var/lib/apt/lists 2>/dev/null || true
+
+        apt-get update -qq
+        apt-get install -y --no-install-recommends libcap2-bin
+
+        # 验证安装结果 - capsh通常在/usr/sbin/capsh
+        if [ -x "/usr/sbin/capsh" ]; then
+            echo "✅ capsh安装成功: /usr/sbin/capsh"
+        elif command -v capsh >/dev/null 2>&1; then
+            echo "✅ capsh安装成功: $(which capsh)"
+        else
+            echo "❌ capsh安装失败"
+            ls -la /usr/sbin/cap* 2>/dev/null || echo "未找到cap*文件"
+            exit 1
+        fi
+    else
+        echo "✅ capsh已可用: $(which capsh)"
+    fi
+
+    # 执行权限收回
+    echo "🔒 执行权限收回..."
+    exec /usr/sbin/capsh --drop=cap_sys_admin -- -c "exec /startup.sh"
 '

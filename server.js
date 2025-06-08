@@ -125,6 +125,7 @@ app.get('/api/user-status', (req, res) => {
             instanceId: instance.instanceId,
             vncUrl: instance.vncUrl,
             status: instance.status,
+            interfaceType: instance.interfaceType,
             createdAt: instance.createdAt
         };
 
@@ -148,7 +149,7 @@ app.get('/api/system-status', (req, res) => {
 // 申请实例
 app.post('/api/apply-instance', async (req, res) => {
     const userId = getUserId(req, res);
-    const { instanceType } = req.body;
+    const { instanceType, interfaceType = 'vnc' } = req.body;
 
     // 检查用户是否已有实例
     if (hasUserInstance(userId)) {
@@ -174,6 +175,7 @@ app.post('/api/apply-instance', async (req, res) => {
             instanceId,
             userId,
             instanceType,
+            interfaceType,
             status: 'creating',
             createdAt: new Date().toISOString(),
             containerId: null,
@@ -189,7 +191,7 @@ app.post('/api/apply-instance', async (req, res) => {
         });
 
         // 异步创建容器和隧道
-        createInstanceAsync(userId, instanceId, instanceType);
+        createInstanceAsync(userId, instanceId, instanceType, interfaceType);
 
     } catch (error) {
         console.error('申请实例时出错:', error);
@@ -201,14 +203,14 @@ app.post('/api/apply-instance', async (req, res) => {
 });
 
 // 异步创建实例
-async function createInstanceAsync(userId, instanceId, instanceType) {
+async function createInstanceAsync(userId, instanceId, instanceType, interfaceType) {
     const instance = userInstances.get(userId);
     if (!instance) return;
 
     try {
         // 1. 创建Docker容器
         instance.status = 'creating_container';
-        const containerInfo = await dockerManager.createVNCContainer(instanceId, instanceType);
+        const containerInfo = await dockerManager.createContainer(instanceId, instanceType, interfaceType);
         instance.containerId = containerInfo.id;
         instance.port = containerInfo.port;
 
@@ -261,6 +263,7 @@ app.get('/api/instance-status/:instanceId', (req, res) => {
             instanceId: instance.instanceId,
             status: instance.status,
             vncUrl: instance.vncUrl,
+            interfaceType: instance.interfaceType,
             error: instance.error,
             createdAt: instance.createdAt
         }
