@@ -41,6 +41,18 @@ class Session(db.Model):
 
 
 def get_free_port():
+    # Use a fixed port range for better Codespaces compatibility
+    base_port = 6080
+    for i in range(MAX_USERS):
+        port = base_port + i
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(('', port))
+            s.close()
+            return port
+        except OSError:
+            continue
+    # Fallback to random port if all fixed ports are taken
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind(('', 0))
     port = s.getsockname()[1]
@@ -217,7 +229,8 @@ def handle_disconnect():
 
 
 def init_db():
-    db.create_all()
+    with app.app_context():
+        db.create_all()
 
 
 if __name__ == '__main__':
