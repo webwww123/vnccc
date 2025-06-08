@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <title>Desktops</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const socket = io();
+    socket.on('chat', msg => {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      document.getElementById('chat').appendChild(div);
+    });
+    socket.on('connect', () => {
+      document.getElementById('status').textContent = '在线';
+    });
+    socket.on('disconnect', () => {
+      document.getElementById('status').textContent = '离线';
+    });
+    setInterval(() => {
+      socket.emit('ping');
+    }, 5000);
+    function send(){
+      const val = document.getElementById('msg').value;
+      socket.emit('chat', val);
+      document.getElementById('msg').value='';
+    }
+  </script>
+</head>
+<body>
+<p id="status"></p>
+<p>剩余机器: {{ remaining }}</p>
+<div id="chat"></div>
+<input id="msg"><button onclick="send()">Send</button>
+<hr>
+<div style="display:flex; flex-wrap:wrap;">
+{% for item in sessions %}
+  {% set s = item.session %}
+  <div style="margin:5px;">
+    <iframe src="http://localhost:{{s.port}}/vnc.html?view_only={{ 'true' if item.view_only else 'false' }}" width="320" height="240"></iframe>
+    <p>剩余 {{ item.remaining }} 秒</p>
+    <a href="{{ url_for('full_view', sid=s.id) }}">放大</a>
+    {% if not item.view_only %}
+      <div>
+        <a href="{{ url_for('extend') }}">续时间</a>
+        <a href="{{ url_for('delete') }}">删除</a>
+      </div>
+    {% endif %}
+  </div>
+{% endfor %}
+</div>
+<a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>
