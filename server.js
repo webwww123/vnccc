@@ -7,7 +7,7 @@ const DockerManager = require('./docker-manager');
 const TunnelManager = require('./tunnel-manager');
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 8001;
 
 // 中间件
 app.use(cors());
@@ -21,12 +21,6 @@ const instanceTimers = new Map();
 
 // 系统限制配置
 const MAX_INSTANCES = 50; // 最大实例数
-const MAX_CREATING_CONCURRENT = 3; // 最大创建并发数
-const QUEUE_ESTIMATE_TIME = 30; // 每个排队用户预计等待时间（秒）
-
-// 排队和创建管理
-const creationQueue = []; // 创建队列
-let currentlyCreating = 0; // 当前正在创建的实例数
 
 // Docker和隧道管理器
 const dockerManager = new DockerManager();
@@ -80,13 +74,6 @@ async function cleanupInstance(userId) {
     if (!instance) return;
 
     try {
-        // 如果实例在队列中，从队列中移除
-        const queueIndex = creationQueue.findIndex(item => item.userId === userId);
-        if (queueIndex !== -1) {
-            creationQueue.splice(queueIndex, 1);
-            console.log(`从创建队列中移除用户 ${userId}`);
-        }
-
         // 停止并删除Docker容器
         if (instance.containerId) {
             await dockerManager.removeContainer(instance.containerId);
@@ -108,9 +95,6 @@ async function cleanupInstance(userId) {
 
         console.log(`实例 ${instance.instanceId} 已清理`);
 
-        // 处理队列（可能有新的空位）
-        setTimeout(processCreationQueue, 1000);
-
     } catch (error) {
         console.error('清理实例时出错:', error);
     }
@@ -121,15 +105,10 @@ async function cleanupInstance(userId) {
 // 获取系统状态
 function getSystemStatus() {
     const onlineCount = userInstances.size;
-    const queueCount = creationQueue.length;
-    const creatingCount = currentlyCreating;
 
     return {
         onlineCount,
-        queueCount,
-        creatingCount,
         maxInstances: MAX_INSTANCES,
-        maxCreating: MAX_CREATING_CONCURRENT,
         systemStatus: onlineCount >= MAX_INSTANCES ? '容量已满' : '正常'
     };
 }
@@ -190,68 +169,27 @@ app.post('/api/apply-instance', async (req, res) => {
     const instanceId = `VNC-${Date.now().toString().substr(-6)}`;
 
     try {
-        // 检查创建并发是否已满
-        if (currentlyCreating >= MAX_CREATING_CONCURRENT) {
-            // 加入排队
-            const queuePosition = creationQueue.length + 1;
-            const estimatedWaitTime = queuePosition * QUEUE_ESTIMATE_TIME;
+        // 直接创建实例
+        const instance = {
+            instanceId,
+            userId,
+            instanceType,
+            status: 'creating',
+            createdAt: new Date().toISOString(),
+            containerId: null,
+            tunnelId: null,
+            vncUrl: null
+        };
+        userInstances.set(userId, instance);
 
-            creationQueue.push({
-                userId,
-                instanceId,
-                instanceType,
-                queuedAt: new Date().toISOString()
-            });
+        res.json({
+            success: true,
+            instanceId,
+            status: 'creating'
+        });
 
-            // 创建排队状态的实例记录
-            const instance = {
-                instanceId,
-                userId,
-                instanceType,
-                status: 'queued',
-                createdAt: new Date().toISOString(),
-                queuePosition,
-                estimatedWaitTime,
-                containerId: null,
-                tunnelId: null,
-                vncUrl: null
-            };
-            userInstances.set(userId, instance);
-
-            res.json({
-                success: true,
-                instanceId,
-                status: 'queued',
-                queuePosition,
-                estimatedWaitTime
-            });
-
-            // 尝试处理队列
-            processCreationQueue();
-
-        } else {
-            // 直接创建
-            const instance = {
-                instanceId,
-                userId,
-                instanceType,
-                status: 'creating',
-                createdAt: new Date().toISOString(),
-                containerId: null,
-                tunnelId: null,
-                vncUrl: null
-            };
-            userInstances.set(userId, instance);
-
-            res.json({
-                success: true,
-                instanceId,
-                status: 'creating'
-            });
-
-            // 异步创建容器和隧道
-            createInstanceAsync(userId, instanceId, instanceType);
-        }
+        // 异步创建容器和隧道
+        createInstanceAsync(userId, instanceId, instanceType);
 
     } catch (error) {
         console.error('申请实例时出错:', error);
@@ -262,47 +200,10 @@ app.post('/api/apply-instance', async (req, res) => {
     }
 });
 
-// 处理创建队列
-async function processCreationQueue() {
-    // 检查是否有空闲的创建槽位
-    while (currentlyCreating < MAX_CREATING_CONCURRENT && creationQueue.length > 0) {
-        const queueItem = creationQueue.shift();
-        const { userId, instanceId, instanceType } = queueItem;
-
-        // 检查用户实例是否还存在（可能已被清理）
-        const instance = userInstances.get(userId);
-        if (!instance || instance.instanceId !== instanceId) {
-            continue;
-        }
-
-        // 更新状态为创建中
-        instance.status = 'creating';
-        delete instance.queuePosition;
-        delete instance.estimatedWaitTime;
-
-        console.log(`开始创建排队实例: ${instanceId}`);
-
-        // 异步创建实例
-        createInstanceAsync(userId, instanceId, instanceType);
-    }
-
-    // 更新队列中剩余用户的位置和预计时间
-    creationQueue.forEach((item, index) => {
-        const instance = userInstances.get(item.userId);
-        if (instance) {
-            instance.queuePosition = index + 1;
-            instance.estimatedWaitTime = (index + 1) * QUEUE_ESTIMATE_TIME;
-        }
-    });
-}
-
 // 异步创建实例
 async function createInstanceAsync(userId, instanceId, instanceType) {
     const instance = userInstances.get(userId);
     if (!instance) return;
-
-    // 增加创建计数
-    currentlyCreating++;
 
     try {
         // 1. 创建Docker容器
@@ -336,12 +237,6 @@ async function createInstanceAsync(userId, instanceId, instanceType) {
 
         // 清理已创建的资源
         await cleanupInstance(userId);
-    } finally {
-        // 减少创建计数
-        currentlyCreating--;
-
-        // 继续处理队列
-        setTimeout(processCreationQueue, 1000);
     }
 }
 
@@ -417,10 +312,38 @@ app.post('/api/heartbeat', (req, res) => {
     }
 });
 
+// 启动时清理所有现有进程
+async function initializeSystem() {
+    console.log('正在初始化系统...');
+
+    // 清理所有cloudflared进程
+    try {
+        console.log('清理现有Cloudflare隧道进程...');
+        await new Promise((resolve) => {
+            const { exec } = require('child_process');
+            exec('pkill -f cloudflared', (error) => {
+                // 忽略错误，因为可能没有进程在运行
+                console.log('Cloudflare隧道进程清理完成');
+                resolve();
+            });
+        });
+    } catch (error) {
+        console.error('清理隧道进程时出错:', error);
+    }
+
+    // 等待Docker管理器初始化完成
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    console.log('系统初始化完成');
+}
+
 // 启动服务器
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`VNC实例申请系统运行在端口 ${PORT}`);
     console.log(`访问地址: http://localhost:${PORT}`);
+
+    // 初始化系统
+    await initializeSystem();
 });
 
 // 优雅关闭

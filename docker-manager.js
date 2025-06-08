@@ -5,6 +5,55 @@ class DockerManager {
         this.docker = new Docker();
         this.usedPorts = new Set();
         this.basePort = 6080; // VNC Web端口起始
+
+        // 初始化时检查现有容器的端口使用情况
+        this.initializePortUsage();
+    }
+
+    // 初始化端口使用情况 - 清理所有现有容器
+    async initializePortUsage() {
+        try {
+            const containers = await this.docker.listContainers({
+                all: true,
+                filters: {
+                    label: ['vnc-instance=true']
+                }
+            });
+
+            if (containers.length > 0) {
+                console.log(`发现 ${containers.length} 个现有VNC容器，正在清理...`);
+
+                for (const containerInfo of containers) {
+                    try {
+                        const container = this.docker.getContainer(containerInfo.Id);
+
+                        // 停止容器
+                        if (containerInfo.State === 'running') {
+                            console.log(`停止容器: ${containerInfo.Names[0]}`);
+                            await container.stop({ t: 5 });
+                        }
+
+                        // 删除容器
+                        console.log(`删除容器: ${containerInfo.Names[0]}`);
+                        await container.remove({ force: true });
+
+                    } catch (error) {
+                        console.error(`清理容器 ${containerInfo.Id} 时出错:`, error.message);
+                    }
+                }
+
+                console.log('所有现有VNC容器已清理完成');
+            } else {
+                console.log('未发现现有VNC容器');
+            }
+
+            // 清空端口使用记录
+            this.usedPorts.clear();
+            console.log('端口使用记录已重置');
+
+        } catch (error) {
+            console.error('初始化端口使用记录时出错:', error);
+        }
     }
 
     // 获取可用端口

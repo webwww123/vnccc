@@ -132,8 +132,6 @@ function enableAllApplyButtons() {
 // 更新系统状态显示
 function updateSystemStatus(systemStatus) {
     document.getElementById('online-count').textContent = systemStatus.onlineCount;
-    document.getElementById('queue-count').textContent = systemStatus.queueCount;
-    document.getElementById('creating-count').textContent = systemStatus.creatingCount;
     document.getElementById('system-status').textContent = systemStatus.systemStatus;
 
     // 根据系统状态更新颜色
@@ -150,14 +148,6 @@ function updateStatusDisplay(instance) {
     var statusDiv = document.getElementById('status-message');
 
     switch (instance.status) {
-        case 'queued':
-            statusDiv.innerHTML =
-                '<font size="2" color="#ff6600" class="blinking">排队等待中...</font><br>' +
-                '<font size="2">实例ID: ' + instance.instanceId + '</font><br>' +
-                '<font size="2">队列位置: 第 ' + (instance.queuePosition || 1) + ' 位</font><br>' +
-                '<font size="1" color="#666666">预计等待时间: ' + (instance.estimatedWaitTime || 30) + ' 秒</font>';
-            break;
-
         case 'creating_container':
             statusDiv.innerHTML =
                 '<font size="2" color="#ff6600" class="blinking">正在创建实例...</font><br>' +
