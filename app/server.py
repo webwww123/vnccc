@@ -19,7 +19,9 @@ db = SQLAlchemy(app)
 client = docker.from_env()
 
 MAX_USERS = 50
-IMAGE = "dorowu/ubuntu-desktop-lxde-vnc:latest"
+IMAGE = os.environ.get("DESKTOP_IMAGE", "dorowu/ubuntu-desktop-lxde-vnc:latest")
+MEM_LIMIT = os.environ.get("DESKTOP_MEM", "512m")
+CPU_LIMIT = float(os.environ.get("DESKTOP_CPUS", "0.5"))
 INACTIVE_TIMEOUT = 600  # seconds
 
 class User(db.Model):
@@ -49,7 +51,9 @@ def start_container(user):
     container = client.containers.run(
         IMAGE,
         detach=True,
-        ports={'6080/tcp': port}
+        ports={'6080/tcp': port},
+        mem_limit=MEM_LIMIT,
+        nano_cpus=int(CPU_LIMIT * 1e9)
     )
     sess = Session(user_id=user.id, container_id=container.id, port=port)
     db.session.add(sess)
@@ -114,9 +118,11 @@ def index():
     if not sess and Session.query.count() < MAX_USERS:
         sess = start_container(user)
     remaining = MAX_USERS - Session.query.count()
+    sessions = Session.query.all()
+    sessions.sort(key=lambda s: 0 if s.user_id == user.id else 1)
     session_info = []
     now = datetime.utcnow()
-    for s in Session.query.all()[:6]:
+    for s in sessions:
         remain = INACTIVE_TIMEOUT - int((now - s.last_active).total_seconds())
         view_only = s.user_id != user.id
         session_info.append({'session': s, 'remaining': max(0, remain), 'view_only': view_only})
@@ -184,20 +190,12 @@ def handle_ping():
 
 @socketio.on('connect')
 def handle_connect():
-    if 'user_id' in flask_session:
-        sess = Session.query.filter_by(user_id=flask_session['user_id']).first()
-        if sess:
-            sess.last_active = datetime.utcnow()
-            db.session.commit()
+    pass
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    if 'user_id' in flask_session:
-        sess = Session.query.filter_by(user_id=flask_session['user_id']).first()
-        if sess:
-            sess.last_active = datetime.utcnow()
-            db.session.commit()
+    pass
 
 
 def init_db():
