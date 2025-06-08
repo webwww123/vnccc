@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>云计算实例申请系统 - VNC云计算公司</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td bgcolor="#cccccc" height="60">
+                <table width="100%" cellpadding="5" cellspacing="0" border="0">
+                    <tr>
+                        <td>
+                            <font size="4" color="#000080"><b>VNC云计算公司 - 实例申请系统</b></font>
+                        </td>
+                        <td align="right">
+                            <font size="2">欢迎使用我们的服务</font>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td height="20" bgcolor="#999999"></td>
+        </tr>
+        <tr>
+            <td>
+                <table width="80%" align="center" cellpadding="10" cellspacing="0" border="1" bordercolor="#666666">
+                    <tr bgcolor="#eeeeee">
+                        <td colspan="4">
+                            <font size="3" color="#000080"><b>云服务器实例规格选择</b></font>
+                        </td>
+                    </tr>
+                    <tr bgcolor="#f5f5f5">
+                        <td width="20%" align="center"><b>CPU核心</b></td>
+                        <td width="20%" align="center"><b>内存大小</b></td>
+                        <td width="30%" align="center"><b>配置说明</b></td>
+                        <td width="30%" align="center"><b>操作</b></td>
+                    </tr>
+                    <tr>
+                        <td align="center">2核</td>
+                        <td align="center">2GB</td>
+                        <td align="center">基础配置，适合轻量应用</td>
+                        <td align="center">
+                            <input type="button" value="申请实例" class="btn-disabled" disabled>
+                            <br><font size="1" color="#999999">暂不可用</font>
+                        </td>
+                    </tr>
+                    <tr bgcolor="#f9f9f9">
+                        <td align="center">4核</td>
+                        <td align="center">4GB</td>
+                        <td align="center">标准配置，适合一般应用</td>
+                        <td align="center">
+                            <input type="button" value="申请实例" class="btn-disabled" disabled>
+                            <br><font size="1" color="#999999">暂不可用</font>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">16核</td>
+                        <td align="center">16GB</td>
+                        <td align="center">高性能配置，适合大型应用</td>
+                        <td align="center">
+                            <input type="button" value="申请实例" class="btn-disabled" disabled>
+                            <br><font size="1" color="#999999">暂不可用</font>
+                        </td>
+                    </tr>
+                    <tr bgcolor="#f9f9f9">
+                        <td align="center">24核</td>
+                        <td align="center">64GB</td>
+                        <td align="center">企业级配置，Ubuntu桌面环境+VNC</td>
+                        <td align="center">
+                            <input type="button" value="申请实例" class="btn-enabled" onclick="applyInstance('24v64g')" id="apply-btn">
+                            <br><font size="1" color="#006600">可申请</font>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td height="30"></td>
+        </tr>
+        <tr>
+            <td>
+                <table width="80%" align="center" cellpadding="10" cellspacing="0" border="1" bordercolor="#666666">
+                    <tr bgcolor="#eeeeee">
+                        <td>
+                            <font size="3" color="#000080"><b>申请状态</b></font>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div id="status-message">
+                                <font size="2">请选择需要申请的实例配置</font>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td height="30"></td>
+        </tr>
+        <tr>
+            <td>
+                <table width="80%" align="center" cellpadding="10" cellspacing="0" border="1" bordercolor="#666666">
+                    <tr bgcolor="#eeeeee">
+                        <td>
+                            <font size="3" color="#000080"><b>重要说明</b></font>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <font size="2">
+                                • 每个用户只能申请一次实例<br>
+                                • 实例基于 dorowu/ubuntu-desktop-lxde-vnc 镜像<br>
+                                • 通过 Cloudflare 隧道提供访问链接<br>
+                                • 实例闲置10分钟后将自动回收<br>
+                                • 无法手动删除实例，请合理使用<br>
+                                • <font color="#006600"><b>无密码访问</b></font> - 点击链接直接进入桌面<br>
+                                • VNC端口: 6080 (Web界面) / 5900 (VNC客户端)
+                            </font>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td height="50" bgcolor="#cccccc" align="center">
+                <font size="1" color="#666666">
+                    © 1999 VNC云计算公司 版权所有 | 技术支持热线: 400-888-9999
+                </font>
+            </td>
+        </tr>
+    </table>
+
+    <script src="script.js"></script>
+</body>
+</html>

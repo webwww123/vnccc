@@ -1,0 +1,124 @@
+/* 上世纪互联网公司风格样式 */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "MS Sans Serif", sans-serif;
+    font-size: 12px;
+    background-color: #e0e0e0;
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+}
+
+table {
+    border-collapse: collapse;
+}
+
+td {
+    font-family: "MS Sans Serif", sans-serif;
+    font-size: 12px;
+}
+
+/* 按钮样式 - 上世纪风格 */
+.btn-enabled {
+    background-color: #c0c0c0;
+    border: 2px outset #c0c0c0;
+    padding: 4px 12px;
+    font-family: "MS Sans Serif", sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+    color: #000000;
+}
+
+.btn-enabled:hover {
+    background-color: #d0d0d0;
+}
+
+.btn-enabled:active {
+    border: 2px inset #c0c0c0;
+    background-color: #a0a0a0;
+}
+
+.btn-disabled {
+    background-color: #808080;
+    border: 2px outset #808080;
+    padding: 4px 12px;
+    font-family: "MS Sans Serif", sans-serif;
+    font-size: 11px;
+    cursor: not-allowed;
+    color: #c0c0c0;
+}
+
+/* 表格边框样式 */
+table[border="1"] {
+    border: 2px inset #c0c0c0;
+}
+
+table[border="1"] td {
+    border: 1px solid #999999;
+    padding: 8px;
+}
+
+/* 标题栏样式 */
+td[bgcolor="#cccccc"] {
+    background: linear-gradient(to bottom, #cccccc 0%, #aaaaaa 100%);
+    border-bottom: 2px solid #999999;
+}
+
+/* 状态消息样式 */
+#status-message {
+    padding: 10px;
+    background-color: #ffffff;
+    border: 1px inset #c0c0c0;
+    min-height: 40px;
+}
+
+/* 闪烁效果 */
+.blinking {
+    animation: blink 1s linear infinite;
+}
+
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* 成功消息样式 */
+.success-message {
+    color: #006600;
+    font-weight: bold;
+}
+
+/* 错误消息样式 */
+.error-message {
+    color: #cc0000;
+    font-weight: bold;
+}
+
+/* 链接样式 - 上世纪风格 */
+a {
+    color: #0000ff;
+    text-decoration: underline;
+}
+
+a:visited {
+    color: #800080;
+}
+
+a:hover {
+    color: #ff0000;
+}
+
+/* 表格行悬停效果 */
+tr:hover {
+    background-color: #f0f0f0 !important;
+}
+
+/* 页面加载动画 */
+body {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
