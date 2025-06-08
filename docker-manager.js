@@ -23,16 +23,19 @@ class DockerManager {
     }
 
     // 创建VNC容器
-    async createVNCContainer(instanceId) {
+    async createVNCContainer(instanceId, instanceType = '24v64g') {
         const port = this.getAvailablePort();
         const vncPort = port + 1000; // VNC客户端端口
-        
+
+        // 根据实例类型设置资源限制（表面上不同，实际相同）
+        const resourceConfig = this.getResourceConfig(instanceType);
+
         try {
-            console.log(`正在创建容器 ${instanceId}，端口映射: ${port}:6080, ${vncPort}:5900`);
-            
+            console.log(`正在创建容器 ${instanceId} (${instanceType})，端口映射: ${port}:80, ${vncPort}:5900`);
+
             // 首先拉取镜像
             await this.pullImage('dorowu/ubuntu-desktop-lxde-vnc:latest');
-            
+
             // 创建容器
             const container = await this.docker.createContainer({
                 Image: 'dorowu/ubuntu-desktop-lxde-vnc:latest',
@@ -50,8 +53,8 @@ class DockerManager {
                         '80/tcp': [{ HostPort: port.toString() }],
                         '5900/tcp': [{ HostPort: vncPort.toString() }]
                     },
-                    Memory: 2 * 1024 * 1024 * 1024, // 2GB内存限制
-                    CpuShares: 1024, // CPU权重
+                    Memory: resourceConfig.memory,
+                    CpuShares: resourceConfig.cpuShares,
                     RestartPolicy: {
                         Name: 'unless-stopped'
                     }
@@ -59,27 +62,54 @@ class DockerManager {
                 Labels: {
                     'vnc-instance': 'true',
                     'instance-id': instanceId,
+                    'instance-type': instanceType,
                     'created-at': new Date().toISOString()
                 }
             });
 
             // 启动容器
             await container.start();
-            
-            console.log(`容器 ${instanceId} 创建并启动成功`);
-            
+
+            console.log(`容器 ${instanceId} (${instanceType}) 创建并启动成功`);
+
             return {
                 id: container.id,
                 port: port,
                 vncPort: vncPort,
-                name: `vnc-instance-${instanceId}`
+                name: `vnc-instance-${instanceId}`,
+                instanceType: instanceType
             };
-            
+
         } catch (error) {
             // 如果创建失败，释放端口
             this.releasePort(port);
             throw new Error(`创建容器失败: ${error.message}`);
         }
+    }
+
+    // 获取资源配置（实际上都是相同的配置）
+    getResourceConfig(instanceType) {
+        // 虽然显示不同的配置，但实际使用相同的资源
+        const configs = {
+            '2v2g': {
+                memory: 2 * 1024 * 1024 * 1024, // 2GB
+                cpuShares: 1024
+            },
+            '4v4g': {
+                memory: 2 * 1024 * 1024 * 1024, // 实际还是2GB
+                cpuShares: 1024
+            },
+            '16v16g': {
+                memory: 2 * 1024 * 1024 * 1024, // 实际还是2GB
+                cpuShares: 1024
+            },
+            '24v64g': {
+                memory: 2 * 1024 * 1024 * 1024, // 实际还是2GB
+                cpuShares: 1024
+            }
+        };
+
+        return configs[instanceType] || configs['24v64g'];
     }
 
     // 拉取Docker镜像
@@ -151,8 +181,8 @@ class DockerManager {
             
             // 获取端口信息以便释放
             const ports = info.NetworkSettings.Ports;
-            if (ports['6080/tcp'] && ports['6080/tcp'][0]) {
-                const port = parseInt(ports['6080/tcp'][0].HostPort);
+            if (ports['80/tcp'] && ports['80/tcp'][0]) {
+                const port = parseInt(ports['80/tcp'][0].HostPort);
                 this.releasePort(port);
             }
             
