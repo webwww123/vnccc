@@ -23,6 +23,8 @@ IMAGE = os.environ.get("DESKTOP_IMAGE", "dorowu/ubuntu-desktop-lxde-vnc:latest")
 MEM_LIMIT = os.environ.get("DESKTOP_MEM", "512m")
 CPU_LIMIT = float(os.environ.get("DESKTOP_CPUS", "0.5"))
 INACTIVE_TIMEOUT = int(os.environ.get('INACTIVE_TIMEOUT', '600'))  # seconds
+ONLINE_THRESHOLD = int(os.environ.get('ONLINE_THRESHOLD', '5'))  # seconds
+PING_INTERVAL = int(os.environ.get('PING_INTERVAL', '1'))  # seconds
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -125,14 +127,21 @@ def index():
     for s in sessions:
         remain = INACTIVE_TIMEOUT - int((now - s.last_active).total_seconds())
         view_only = s.user_id != user.id
-        online = now - s.last_active < timedelta(seconds=5)
+        online = now - s.last_active < timedelta(seconds=ONLINE_THRESHOLD)
         session_info.append({
             'session': s,
             'remaining': max(0, remain),
             'view_only': view_only,
-            'online': online
+            'online': online,
+            'username': User.query.get(s.user_id).username
         })
-    return render_template('index.html', sessions=session_info, self_id=user.id, remaining=remaining)
+    return render_template(
+        'index.html',
+        sessions=session_info,
+        self_id=user.id,
+        remaining=remaining,
+        ping_interval=PING_INTERVAL * 1000
+    )
 
 
 @app.route('/full/<int:sid>')

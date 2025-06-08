@@ -22,6 +22,9 @@ A simple chat is available on the home page.
 - Passwords stored using Werkzeug hashing.
 - Containers run with configurable memory and CPU limits.
 - Remaining time, online status and a fullscreen link shown for each desktop.
+- Usernames displayed next to each desktop.
+- Online status determined by client pings; interval and threshold can be
+  configured with environment variables.
 
 ## Running
 
@@ -39,6 +42,8 @@ DESKTOP_MEM=512m \
 DESKTOP_CPUS=0.5 \
 MAX_USERS=20 \
 INACTIVE_TIMEOUT=300 \
+ONLINE_THRESHOLD=5 \
+PING_INTERVAL=1 \
 SECRET_KEY=mysecret \
 python app/server.py
 ```

@@ -16,9 +16,10 @@
     socket.on('disconnect', () => {
       document.getElementById('status').textContent = '离线';
     });
+    const pingInterval = {{ ping_interval|default(1000) }};
     setInterval(() => {
       socket.emit('ping');
-    }, 5000);
+    }, pingInterval);
     function send(){
       const val = document.getElementById('msg').value;
       socket.emit('chat', val);
@@ -36,7 +37,7 @@
 {% for item in sessions %}
   {% set s = item.session %}
   <div style="margin:5px;">
-    <p>{{ '在线' if item.online else '离线' }}</p>
+    <p>{{ item.username }} - {{ '在线' if item.online else '离线' }}</p>
     <iframe src="http://localhost:{{s.port}}/vnc.html?view_only={{ 'true' if item.view_only else 'false' }}" width="320" height="240"></iframe>
     <p>剩余 {{ item.remaining }} 秒</p>
     <a href="{{ url_for('full_view', sid=s.id) }}">放大</a>
