@@ -224,7 +224,21 @@ async function createInstanceAsync(userId, instanceId, instanceType, interfaceTy
         instance.status = 'starting';
         await dockerManager.waitForContainer(instance.containerId);
 
-        // 4. 实例就绪
+        // 4. 激活端口暴露（特别是Web终端）
+        if (interfaceType === 'terminal') {
+            console.log(`激活Web终端端口 ${containerInfo.port}...`);
+            try {
+                const axios = require('axios');
+                // 发送请求激活端口暴露
+                await axios.get(`http://localhost:${containerInfo.port}/`, { timeout: 5000 }).catch(() => {});
+                await axios.get(`http://localhost:${containerInfo.port}/token`, { timeout: 5000 }).catch(() => {});
+                console.log(`Web终端端口 ${containerInfo.port} 已激活`);
+            } catch (error) {
+                console.log(`端口激活请求发送完成: ${error.message}`);
+            }
+        }
+
+        // 5. 实例就绪
         instance.status = 'ready';
 
         // 5. 设置10分钟闲置回收定时器

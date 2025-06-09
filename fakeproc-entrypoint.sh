@@ -88,12 +88,30 @@ exec unshare -Urmpf bash -c '
         head -5 /proc/cpuinfo
     fi
     
-    # 隐藏真实硬件信息路径
-    echo "🛡️ 隐藏真实硬件信息..."
+    # 创建假的sys文件系统结构
+    echo "🛡️ 创建假的sys文件系统..."
     if [ -d /sys/devices/system/cpu ]; then
-        mount -t tmpfs tmpfs /sys/devices/system/cpu -o ro,nosuid,nodev,noexec 2>/dev/null || true
+        # 先备份原始目录结构
+        cp -r /sys/devices/system/cpu /tmp/cpu_backup 2>/dev/null || true
+
+        # 用tmpfs覆盖
+        mount -t tmpfs tmpfs /sys/devices/system/cpu 2>/dev/null || true
+
+        # 创建假的CPU目录结构（24个CPU）
+        for i in $(seq 0 23); do
+            mkdir -p /sys/devices/system/cpu/cpu$i
+            echo 1 > /sys/devices/system/cpu/cpu$i/online 2>/dev/null || true
+        done
+
+        # 创建online文件
+        echo "0-23" > /sys/devices/system/cpu/online 2>/dev/null || true
+        echo "0-23" > /sys/devices/system/cpu/present 2>/dev/null || true
+        echo "0-23" > /sys/devices/system/cpu/possible 2>/dev/null || true
+
+        echo "✅ 创建了24个假CPU目录"
     fi
-    
+
+    # 隐藏固件信息
     if [ -d /sys/firmware ]; then
         mount -t tmpfs tmpfs /sys/firmware -o ro,nosuid,nodev,noexec 2>/dev/null || true
     fi
