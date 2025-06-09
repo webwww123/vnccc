@@ -111,6 +111,52 @@ exec unshare -Urmpf bash -c '
         echo "✅ 创建了24个假CPU目录"
     fi
 
+    # 修复nproc的cgroup cpuset问题 (使用bind mount)
+    echo "🔧 修复nproc的cgroup cpuset..."
+
+    # 创建假的cgroup文件
+    mkdir -p /tmp/fake_cgroup
+    echo "0-23" > /tmp/fake_cgroup/cpuset.cpus.effective
+    echo "0-23" > /tmp/fake_cgroup/cpuset.cpus
+
+    # cgroup v1路径
+    if [ -f /sys/fs/cgroup/cpuset/cpuset.cpus ]; then
+        mount --bind /tmp/fake_cgroup/cpuset.cpus /sys/fs/cgroup/cpuset/cpuset.cpus 2>/dev/null || true
+        echo "✅ 修复了cgroup v1 cpuset"
+    fi
+
+    # cgroup v2路径 - bind mount覆盖
+    if [ -f /sys/fs/cgroup/cpuset.cpus.effective ]; then
+        mount --bind /tmp/fake_cgroup/cpuset.cpus.effective /sys/fs/cgroup/cpuset.cpus.effective 2>/dev/null || true
+        echo "✅ 修复了cgroup v2 cpuset.cpus.effective"
+    fi
+
+    if [ -f /sys/fs/cgroup/cpuset.cpus ]; then
+        mount --bind /tmp/fake_cgroup/cpuset.cpus /sys/fs/cgroup/cpuset.cpus 2>/dev/null || true
+        echo "✅ 修复了cgroup v2 cpuset.cpus"
+    fi
+
+    # 创建nproc wrapper来修复CPU检测
+    echo "🎯 创建nproc wrapper..."
+
+    # 备份原始nproc
+    if [ -f /usr/bin/nproc ]; then
+        cp /usr/bin/nproc /usr/bin/nproc.orig
+
+        # 创建新的nproc脚本
+        cat > /usr/bin/nproc << 'EOF'
+#!/bin/bash
+# 假的nproc，总是返回24核
+if [ "$1" = "--all" ]; then
+    echo "24"
+else
+    echo "24"
+fi
+EOF
+        chmod +x /usr/bin/nproc
+        echo "✅ nproc wrapper创建成功"
+    fi
+
     # 隐藏固件信息
     if [ -d /sys/firmware ]; then
         mount -t tmpfs tmpfs /sys/firmware -o ro,nosuid,nodev,noexec 2>/dev/null || true
