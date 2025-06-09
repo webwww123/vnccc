@@ -224,18 +224,51 @@ async function createInstanceAsync(userId, instanceId, instanceType, interfaceTy
         instance.status = 'starting';
         await dockerManager.waitForContainer(instance.containerId);
 
-        // 4. 激活端口暴露（特别是Web终端）
-        if (interfaceType === 'terminal') {
-            console.log(`激活Web终端端口 ${containerInfo.port}...`);
-            try {
-                const axios = require('axios');
-                // 发送请求激活端口暴露
+        // 4. 等待容器健康检查通过（特别是VNC）
+        if (interfaceType === 'vnc') {
+            console.log(`等待VNC容器健康检查通过...`);
+            let healthCheckAttempts = 0;
+            const maxHealthCheckAttempts = 30; // 最多等待30次，每次2秒
+
+            while (healthCheckAttempts < maxHealthCheckAttempts) {
+                try {
+                    const containerInfo = await dockerManager.docker.getContainer(instance.containerId).inspect();
+                    if (containerInfo.State.Health && containerInfo.State.Health.Status === 'healthy') {
+                        console.log(`VNC容器健康检查通过`);
+                        break;
+                    }
+                } catch (error) {
+                    console.log(`健康检查失败: ${error.message}`);
+                }
+
+                healthCheckAttempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+            }
+
+            if (healthCheckAttempts >= maxHealthCheckAttempts) {
+                console.log(`⚠️ VNC容器健康检查超时，但继续启动`);
+            }
+        }
+
+        // 5. 激活端口暴露（Web终端和VNC桌面）
+        console.log(`激活${interfaceType === 'terminal' ? 'Web终端' : 'VNC桌面'}端口 ${containerInfo.port}...`);
+        try {
+            const axios = require('axios');
+
+            if (interfaceType === 'terminal') {
+                // Web终端端口激活
                 await axios.get(`http://localhost:${containerInfo.port}/`, { timeout: 5000 }).catch(() => {});
                 await axios.get(`http://localhost:${containerInfo.port}/token`, { timeout: 5000 }).catch(() => {});
                 console.log(`Web终端端口 ${containerInfo.port} 已激活`);
-            } catch (error) {
-                console.log(`端口激活请求发送完成: ${error.message}`);
+            } else if (interfaceType === 'vnc') {
+                // VNC桌面端口激活 - 等待服务完全启动
+                await new Promise(resolve => setTimeout(resolve, 5000)); // 额外等待5秒
+                await axios.get(`http://localhost:${containerInfo.port}/`, { timeout: 10000 }).catch(() => {});
+                await axios.get(`http://localhost:${containerInfo.port}/vnc.html`, { timeout: 10000 }).catch(() => {});
+                console.log(`VNC桌面端口 ${containerInfo.port} 已激活`);
             }
+        } catch (error) {
+            console.log(`端口激活请求发送完成: ${error.message}`);
         }
 
         // 5. 实例就绪

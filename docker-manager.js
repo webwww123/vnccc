@@ -118,8 +118,8 @@ class DockerManager {
                     `FAKE_DISK_SIZE=${fakeConfig.diskSectors}`,
                     `INSTANCE_TYPE=${instanceType}`
                 ],
-                Entrypoint: ['/fakeproc-entrypoint.sh'],
-                Cmd: [],  // 必须清空，否则原CMD会被附加
+                Entrypoint: ['/vnc-fakeproc-entrypoint.sh'],
+                Cmd: ['/startup.sh'],  // VNC启动脚本
                 ExposedPorts: {
                     '80/tcp': {},
                     '5900/tcp': {}
@@ -145,10 +145,7 @@ class DockerManager {
                         'no-new-privileges'
                     ],
                     Binds: [
-                        `${path.resolve(__dirname, 'fakeproc-entrypoint.sh')}:/fakeproc-entrypoint.sh:ro`,
-                        `${path.resolve(__dirname, 'fakeprocfs.py')}:/fakeprocfs.py:ro`,
-                        `${path.resolve(__dirname, 'create-fake-proc.py')}:/create-fake-proc.py:ro`,
-                        `${path.resolve(__dirname, 'specgen.sh')}:/specgen:ro`
+                        `${path.resolve(__dirname, 'vnc-fakeproc-entrypoint.sh')}:/vnc-fakeproc-entrypoint.sh:ro`
                     ]
                 },
                 Labels: {
