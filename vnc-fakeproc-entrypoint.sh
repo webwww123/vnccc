@@ -116,12 +116,32 @@ DirectMap2M:     4063232 kB
 DirectMap1G:    $((FAKE_MEMORY_KB - 4194304)) kB
 EOF
 
-# 3. 轻量级bind mount (只覆盖关键文件)
+# 3. 创建假的sys文件系统结构 (lscpu支持)
+echo "🔗 创建假的sys CPU目录..."
+if [ -d /sys/devices/system/cpu ]; then
+    # 用tmpfs覆盖
+    mount -t tmpfs tmpfs /sys/devices/system/cpu 2>/dev/null || true
+
+    # 创建假的CPU目录结构（24个CPU）
+    for i in $(seq 0 $((FAKE_CPU_CORES-1))); do
+        mkdir -p /sys/devices/system/cpu/cpu$i
+        echo 1 > /sys/devices/system/cpu/cpu$i/online 2>/dev/null || true
+    done
+
+    # 创建online文件
+    echo "0-$((FAKE_CPU_CORES-1))" > /sys/devices/system/cpu/online 2>/dev/null || true
+    echo "0-$((FAKE_CPU_CORES-1))" > /sys/devices/system/cpu/present 2>/dev/null || true
+    echo "0-$((FAKE_CPU_CORES-1))" > /sys/devices/system/cpu/possible 2>/dev/null || true
+
+    echo "✅ 创建了${FAKE_CPU_CORES}个假CPU目录"
+fi
+
+# 4. 轻量级bind mount (只覆盖关键文件)
 echo "🔗 应用硬件伪造..."
 mount --bind /tmp/fake_proc/cpuinfo /proc/cpuinfo 2>/dev/null || echo "⚠️ cpuinfo bind mount失败"
 mount --bind /tmp/fake_proc/meminfo /proc/meminfo 2>/dev/null || echo "⚠️ meminfo bind mount失败"
 
-# 4. 创建简单的nproc wrapper (不影响系统服务)
+# 5. 创建简单的nproc wrapper (不影响系统服务)
 if [ -f /usr/bin/nproc ]; then
     cp /usr/bin/nproc /usr/bin/nproc.orig 2>/dev/null || true
     cat > /usr/bin/nproc << 'EOF'
