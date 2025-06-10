@@ -34,13 +34,15 @@
                     </tr>
                     <tr>
                         <td align="center">
-                            <input type="radio" name="interfaceType" value="vnc" id="interface-vnc" checked>
-                            <label for="interface-vnc"><font size="2"><b>🖥️ 图形界面 (VNC桌面)</b></font></label>
-                            <font size="1" color="#666666"> - Ubuntu桌面环境，支持图形应用</font>
-                            <br><br>
-                            <input type="radio" name="interfaceType" value="terminal" id="interface-terminal">
+                            <input type="radio" name="interfaceType" value="terminal" id="interface-terminal" checked>
                             <label for="interface-terminal"><font size="2"><b>💻 Web终端 (命令行)</b></font></label>
-                            <font size="1" color="#666666"> - Ubuntu命令行界面，轻量高效</font>
+                            <font size="1" color="#009900"><b> - 推荐选择，轻量高效</b></font>
+                            <br><font size="1" color="#666666">Ubuntu命令行界面，支持所有开发工具</font>
+                            <br><br>
+                            <input type="radio" name="interfaceType" value="vnc" id="interface-vnc">
+                            <label for="interface-vnc"><font size="2"><b>🖥️ 图形界面 (VNC桌面)</b></font></label>
+                            <font size="1" color="#ff6600"> - 可能较卡</font>
+                            <br><font size="1" color="#666666">Ubuntu桌面环境，支持图形应用</font>
                         </td>
                     </tr>
                 </table>
@@ -68,8 +70,8 @@
                         <td align="center">2GB</td>
                         <td align="center">基础配置，适合轻量应用</td>
                         <td align="center">
-                            <input type="button" value="申请实例" class="btn-enabled" onclick="applyInstance('2v2g')" id="apply-btn-2v2g">
-                            <br><font size="1" color="#006600">可申请</font>
+                            <input type="button" value="暂不可用" class="btn-disabled" disabled>
+                            <br><font size="1" color="#999999">暂不可用</font>
                         </td>
                     </tr>
                     <tr bgcolor="#f9f9f9">
@@ -77,8 +79,8 @@
                         <td align="center">4GB</td>
                         <td align="center">标准配置，适合一般应用</td>
                         <td align="center">
-                            <input type="button" value="申请实例" class="btn-enabled" onclick="applyInstance('4v4g')" id="apply-btn-4v4g">
-                            <br><font size="1" color="#006600">可申请</font>
+                            <input type="button" value="暂不可用" class="btn-disabled" disabled>
+                            <br><font size="1" color="#999999">暂不可用</font>
                         </td>
                     </tr>
                     <tr>
@@ -86,8 +88,8 @@
                         <td align="center">16GB</td>
                         <td align="center">高性能配置，适合大型应用</td>
                         <td align="center">
-                            <input type="button" value="申请实例" class="btn-enabled" onclick="applyInstance('16v16g')" id="apply-btn-16v16g">
-                            <br><font size="1" color="#006600">可申请</font>
+                            <input type="button" value="暂不可用" class="btn-disabled" disabled>
+                            <br><font size="1" color="#999999">暂不可用</font>
                         </td>
                     </tr>
                     <tr bgcolor="#f9f9f9">

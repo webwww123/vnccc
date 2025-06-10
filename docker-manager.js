@@ -106,7 +106,7 @@ class DockerManager {
                 Image: 'dorowu/ubuntu-desktop-lxde-vnc:latest',
                 name: `vnc-instance-${instanceId}`,
                 Env: [
-                    'RESOLUTION=1024x768',
+                    'RESOLUTION=1440x900',
                     'USER=ubuntu',
                     // 传递伪造的硬件信息
                     `FAKE_CPU=Intel Xeon Gold 6248`,

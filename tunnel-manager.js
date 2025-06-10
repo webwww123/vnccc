@@ -68,13 +68,25 @@ class TunnelManager {
     // 启动隧道进程
     async startTunnel(tunnelName, localPort) {
         return new Promise((resolve, reject) => {
-            // 使用cloudflared创建临时隧道（免费，无需登录）
-            const args = [
-                'tunnel',
-                '--url', `http://localhost:${localPort}`,
-                '--no-autoupdate',
-                '--logfile', '/dev/null'  // 减少日志输出
-            ];
+            // 如果是首页，使用machine-manager隧道，否则使用quick隧道
+            let args;
+            if (tunnelName === 'machine-manager') {
+                // 对于首页，使用quick隧道（临时方案）
+                args = [
+                    'tunnel',
+                    '--url', `http://localhost:${localPort}`,
+                    '--no-autoupdate',
+                    '--logfile', '/dev/null'
+                ];
+            } else {
+                // 对于实例，使用quick隧道
+                args = [
+                    'tunnel',
+                    '--url', `http://localhost:${localPort}`,
+                    '--no-autoupdate',
+                    '--logfile', '/dev/null'
+                ];
+            }
 
             const tunnelProcess = spawn(this.cloudflaredPath, args, {
                 stdio: ['ignore', 'pipe', 'pipe']

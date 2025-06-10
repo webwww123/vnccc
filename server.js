@@ -415,6 +415,17 @@ app.listen(PORT, async () => {
     // 初始化系统
     await initializeSystem();
 
+    // 使用现有的machine-manager隧道
+    try {
+        console.log('正在启动machine-manager隧道...');
+        const mainTunnelResult = await tunnelManager.createTunnel('machine-manager', PORT);
+        console.log(`✅ machine-manager隧道启动成功: ${mainTunnelResult.url}`);
+        console.log(`🌐 外部访问地址: ${mainTunnelResult.url}`);
+    } catch (error) {
+        console.log(`⚠️ machine-manager隧道启动失败: ${error.message}`);
+        console.log(`本地访问地址: http://localhost:${PORT}`);
+    }
+
     // 启动活动监控
     startActivityMonitor();
     console.log('容器活动监控已启动');
