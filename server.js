@@ -214,15 +214,15 @@ async function createInstanceAsync(userId, instanceId, instanceType, interfaceTy
         instance.containerId = containerInfo.id;
         instance.port = containerInfo.port;
 
-        // 2. 创建Cloudflare隧道
+        // 2. 等待容器完全启动
+        instance.status = 'starting';
+        await dockerManager.waitForContainer(instance.containerId);
+
+        // 3. 创建Cloudflare隧道（在容器就绪后）
         instance.status = 'creating_tunnel';
         const tunnelInfo = await tunnelManager.createTunnel(instanceId, containerInfo.port);
         instance.tunnelId = tunnelInfo.id;
         instance.vncUrl = tunnelInfo.url;
-
-        // 3. 等待容器完全启动
-        instance.status = 'starting';
-        await dockerManager.waitForContainer(instance.containerId);
 
         // 4. 等待容器健康检查通过（特别是VNC）
         if (interfaceType === 'vnc') {

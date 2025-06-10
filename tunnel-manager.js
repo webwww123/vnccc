@@ -10,19 +10,19 @@ class TunnelManager {
     // 创建Cloudflare隧道
     async createTunnel(instanceId, localPort) {
         const tunnelName = `vnc-${instanceId}`;
-        
+
         try {
             console.log(`正在为实例 ${instanceId} 创建Cloudflare隧道，本地端口: ${localPort}`);
-            
+
             // 检查cloudflared是否可用
             await this.checkCloudflaredAvailable();
-            
+
             // 启动隧道
             const tunnelProcess = await this.startTunnel(tunnelName, localPort);
-            
+
             // 等待隧道URL生成
             const tunnelUrl = await this.waitForTunnelUrl(tunnelProcess, instanceId);
-            
+
             const tunnelInfo = {
                 id: tunnelName,
                 instanceId,
@@ -31,16 +31,17 @@ class TunnelManager {
                 process: tunnelProcess,
                 createdAt: new Date().toISOString()
             };
-            
+
             this.tunnels.set(tunnelName, tunnelInfo);
-            
-            // 隧道创建成功的日志已在上面输出
-            
+
+            // 等待隧道完全就绪（添加延迟和健康检查）
+            await this.waitForTunnelReady(tunnelUrl, localPort);
+
             return {
                 id: tunnelName,
                 url: tunnelUrl
             };
-            
+
         } catch (error) {
             throw new Error(`创建Cloudflare隧道失败: ${error.message}`);
         }
@@ -271,6 +272,51 @@ class TunnelManager {
                 error: error.message
             };
         }
+    }
+
+    // 等待隧道完全就绪
+    async waitForTunnelReady(tunnelUrl, localPort, maxWaitTime = 60000) {
+        console.log(`等待隧道 ${tunnelUrl} 完全就绪...`);
+        const startTime = Date.now();
+        let attempts = 0;
+
+        while (Date.now() - startTime < maxWaitTime) {
+            attempts++;
+
+            try {
+                // 首先检查本地端口是否可访问
+                const localResponse = await axios.get(`http://localhost:${localPort}`, {
+                    timeout: 5000,
+                    validateStatus: () => true
+                });
+
+                if (localResponse.status === 200) {
+                    // 本地端口正常，再检查隧道
+                    const tunnelResponse = await axios.get(tunnelUrl, {
+                        timeout: 10000,
+                        validateStatus: () => true
+                    });
+
+                    if (tunnelResponse.status === 200) {
+                        console.log(`✅ 隧道 ${tunnelUrl} 已就绪 (尝试 ${attempts} 次)`);
+                        return true;
+                    } else {
+                        console.log(`隧道返回状态码 ${tunnelResponse.status}，继续等待...`);
+                    }
+                } else {
+                    console.log(`本地端口 ${localPort} 返回状态码 ${localResponse.status}，继续等待...`);
+                }
+
+            } catch (error) {
+                console.log(`隧道健康检查失败 (尝试 ${attempts}): ${error.message}`);
+            }
+
+            // 等待2秒后重试
+            await this.sleep(2000);
+        }
+
+        console.log(`⚠️ 隧道 ${tunnelUrl} 健康检查超时，但继续使用`);
+        return false;
     }
 
     // 工具方法：睡眠
